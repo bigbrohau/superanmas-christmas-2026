@@ -178,12 +178,39 @@
     .buttons button {font-size:9px;padding:9px 9px;}
   }
 
+
+  /* Photo export: small, reachable quick-save icon on mobile portrait and landscape. */
+  .quick-save {display:none;}
+  @media (max-width:900px) {
+    .quick-save {
+      display:flex; position:absolute; z-index:26; width:42px; height:42px;
+      right:max(12px,env(safe-area-inset-right)); top:max(12px,env(safe-area-inset-top));
+      justify-content:center; align-items:center; padding:0; border-radius:50%;
+      border:1px solid rgba(255,217,140,.63); background:rgba(10,19,22,.84);
+      color:#ffe0a1; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+      touch-action:manipulation; box-shadow:0 5px 15px rgba(0,0,0,.35);
+    }
+    .quick-save svg {width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  }
+  @media (max-width:680px) and (orientation:portrait) {
+    .quick-save {top:max(52px,env(safe-area-inset-top));right:max(11px,env(safe-area-inset-right));}
+  }
+  .quick-save:disabled, #save:disabled {opacity:.46;cursor:wait;}
+  .save-notice {position:fixed;z-index:80;bottom:max(72px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+    width:max-content;max-width:92vw;opacity:0;pointer-events:none;transition:opacity .18s;
+    background:rgba(13,22,26,.94);color:#ffe4b5;border:1px solid rgba(248,211,149,.55);
+    border-radius:20px;padding:11px 16px;font:500 12px/1.45 ui-sans-serif,system-ui,sans-serif;
+    text-align:center;box-shadow:0 10px 25px rgba(0,0,0,.4);}
+  .save-notice.visible {opacity:1;}
 </style>
 </head>
 <body>
 
 <main class="card-stage" id="card-stage" aria-label="Animated Christmas greeting card with original family portrait and ASCII Christmas tree">
   <canvas id="scene" aria-label="Three-dimensional rotating Christmas tree made of animated ASCII characters"></canvas>
+  <button id="quick-save" class="quick-save" type="button" aria-label="Save Christmas card to photos" title="Save Christmas card" disabled>
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12m-4-4 4 4 4-4M4 17v3h16v-3"/></svg>
+  </button>
   <span class="gold-spark s1">✧</span><span class="gold-spark s2">✦</span>
   <span class="gold-spark s3">✧</span><span class="gold-spark s4">✦</span>
   <div class="family-glow" aria-hidden="true"></div>
@@ -202,14 +229,14 @@
   <div class="bottom" aria-label="Animation controls">
     <p class="readout" id="stats"></p>
     <div class="buttons">
-      <button id="pause" type="button" aria-label="Pause or resume animation">Ⅱ Pause</button>
       <button id="restart" type="button">↺ Replay</button>
-      <button id="save" type="button">↓ Save Card</button>
+      <button id="save" type="button" disabled>↓ Save Card</button>
     </div>
     <p class="hint">Drag to rotate the tree</p>
   </div>
   <span class="footer-mark">SUPERANMAS · CHRISTMAS 2026</span>
 </main>
+<div class="save-notice" id="save-notice" role="status" aria-live="polite"></div>
 
 <script>
 (() => {
@@ -218,7 +245,6 @@
   const ctx = canvas.getContext('2d', {alpha:false});
   const elStats = document.getElementById('stats');
   const elState = document.getElementById('state');
-  const pauseBtn = document.getElementById('pause');
   const TWO_PI = Math.PI * 2;
   let seed = 20261225;
   function rand() { seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }
@@ -229,7 +255,7 @@
 
   let W=0,H=0,dpr=1,treeH=0,treeR=0,centerX=0,baseY=0;
   let snow=[],stars=[],tree=[],garlands=[],ornaments=[],snowField=[];
-  let angle=0,paused=false,dragging=false,dragX=0,dragMoved=0,elapsed=0,lastTime=0;
+  let angle=0,dragging=false,dragX=0,dragMoved=0,elapsed=0,lastTime=0;
   const GROUND_SECONDS=1.72, TREE_START=1.30, BUILD_SECONDS=6.15;
   const LIGHTS_START=7.45, GIFT_START=7.95, STAR_START=8.95;
   const revealGround=t=>clamp(t/GROUND_SECONDS,0,1);
@@ -366,7 +392,7 @@
       ctx.fillRect(p.x,p.y,p.r,p.r);
     }
     for(const p of snow){
-      if(!paused){p.y+=dt*p.speed*p.parallax;p.x+=Math.sin(t*.6+p.phase)*dt*3;}
+      p.y+=dt*p.speed*p.parallax;p.x+=Math.sin(t*.6+p.phase)*dt*3;
       if(p.y>H){p.y=-4;p.x=range(0,W);}
       if(p.x<0)p.x=W;if(p.x>W)p.x=0;
       const a=.24+.25*p.parallax;
@@ -807,7 +833,7 @@ function gifts(t,front){
   function frame(now){
     const dt=lastTime?clamp((now-lastTime)/1000,0,.07):0;
     lastTime=now;
-    if(!paused){elapsed+=dt;if(!dragging)angle+=dt*.29;}
+    elapsed+=dt;if(!dragging)angle+=dt*.29;
     background(elapsed,dt);
     ground(elapsed);
     gifts(elapsed,false);
@@ -818,7 +844,7 @@ function gifts(t,front){
     gifts(elapsed,true);
     starTop(elapsed);
     const buildPercent=Math.round(revealLevel(elapsed)*100);
-    elState.textContent=paused?'PAUSED':elapsed<TREE_START?'SNOW BLOOM':elapsed<TREE_START+BUILD_SECONDS?`GROWING ${buildPercent}%`:elapsed<STAR_START+.8?'ADDING GIFTS & LIGHTS':'LIVE RENDER';
+    elState.textContent=elapsed<TREE_START?'SNOW BLOOM':elapsed<TREE_START+BUILD_SECONDS?`GROWING ${buildPercent}%`:elapsed<STAR_START+.8?'ADDING GIFTS & LIGHTS':'LIVE RENDER';
     elStats.textContent=elapsed<TREE_START
       ?`SNOW EXPANDING ${Math.round(revealGround(elapsed)*100)}%  ·  GOLD RIBBON STARTING`
       :elapsed<TREE_START+BUILD_SECONDS
@@ -826,53 +852,200 @@ function gifts(t,front){
         :`ROTATION ${((angle*180/Math.PI)%360+360)%360|0}°  ·  GIFTS 11  ·  LIGHTS 144  ·  ASCII ${tree.length.toLocaleString('en-US')}`;
     requestAnimationFrame(frame);
   }
-  function setPause(p){paused=p;pauseBtn.textContent=p?'▶ Resume':'Ⅱ Pause';}
-  pauseBtn.addEventListener('click',()=>setPause(!paused));
-  document.getElementById('restart').addEventListener('click',()=>{angle=0;elapsed=0;setupTree();setPause(false);});
-  document.getElementById('save').addEventListener('click',()=>{
-    // Export a complete Christmas card even if the user saves while the tree is still growing.
-    if(elapsed<STAR_START+1.2){
-      const t=STAR_START+2.6;
-      background(t,0);ground(t);gifts(t,false);goldenSpiral(t,false);
-      renderTree(t);scanRing(t);goldenSpiral(t,true);gifts(t,true);starTop(t);
+  // Photo export is kept independent of animation and uses a real PNG File.
+  // Cached ahead of user interaction so iOS native sharing keeps its user gesture.
+  const saveButton=document.getElementById('save');
+  const quickSaveButton=document.getElementById('quick-save');
+  const saveNotice=document.getElementById('save-notice');
+  const photo=document.getElementById('family-photo');
+  const cardStage=document.getElementById('card-stage');
+  let exportFile=null, exportVersion=0, exportTimer=0, noticeTimer=0;
+  const filename='SuperAnmas_Christmas_2026.png';
+  function notice(message){
+    saveNotice.textContent=message;
+    saveNotice.classList.add('visible');
+    clearTimeout(noticeTimer);
+    noticeTimer=setTimeout(()=>saveNotice.classList.remove('visible'),4000);
+  }
+  function setSaveAvailable(ready){
+    saveButton.disabled=!ready;
+    quickSaveButton.disabled=!ready;
+    saveButton.textContent=ready?'↓ Save Card':'準備賀卡圖片…';
+    quickSaveButton.setAttribute('aria-label',ready?'Save Christmas card to Photos':'Preparing Christmas card');
+  }
+  function measured(el){
+    const stage=cardStage.getBoundingClientRect(),r=el.getBoundingClientRect();
+    return {x:r.left-stage.left,y:r.top-stage.top,w:r.width,h:r.height};
+  }
+  function paintText(cx,el,color){
+    if(!el)return;
+    const st=getComputedStyle(el);
+    if(st.display==='none'||st.visibility==='hidden')return;
+    cx.save();
+    cx.font=`${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
+    if('letterSpacing' in cx)cx.letterSpacing=st.letterSpacing==='normal'?'0px':st.letterSpacing;
+    cx.fillStyle=color;
+    cx.shadowColor='rgba(0,0,0,.54)';cx.shadowBlur=8;
+    cx.textBaseline='alphabetic';
+    const alignment=st.textAlign==='center'?'center':'left';
+    cx.textAlign=alignment;
+    const base=measured(el), size=parseFloat(st.fontSize)||16;
+    const textNode=[...el.childNodes].find(n=>n.nodeType===Node.TEXT_NODE);
+    const ranges=[];
+    if(textNode && el.classList.contains('wish')){
+      const content=textNode.nodeValue;
+      const rx=/\S+/g;let match;
+      while((match=rx.exec(content))){
+        const range=document.createRange();
+        range.setStart(textNode,match.index);range.setEnd(textNode,match.index+match[0].length);
+        const rect=range.getBoundingClientRect();
+        const stage=cardStage.getBoundingClientRect();
+        const centerY=rect.top-stage.top+rect.height/2;
+        let group=ranges.find(r=>Math.abs(r.centerY-centerY)<3);
+        if(!group){group={centerY,words:[]};ranges.push(group);}
+        group.words.push(match[0]);
+      }
     }
-    const out=document.createElement('canvas');out.width=canvas.width;out.height=canvas.height;
-    const cx=out.getContext('2d');cx.setTransform(dpr,0,0,dpr,0,0);
-    cx.drawImage(canvas,0,0,W,H);
-    const stageRect=document.getElementById('card-stage').getBoundingClientRect();
-    const family=document.getElementById('family-photo');
-    const r=family.getBoundingClientRect();
-    if(family.complete&&family.naturalWidth) {
-      cx.save();cx.shadowColor='rgba(0,0,0,.44)';cx.shadowBlur=17;
-      cx.drawImage(family,r.left-stageRect.left,r.top-stageRect.top,r.width,r.height);cx.restore();
+    function paint(line,centerY){
+      const box=cx.measureText(line);
+      const asc=box.actualBoundingBoxAscent||size*.75;
+      const desc=box.actualBoundingBoxDescent||size*.2;
+      const x=alignment==='center'?base.x+base.w/2:base.x;
+      cx.fillText(line,x,centerY+(asc-desc)/2);
     }
-    const textParts=[
-      ['.eyebrow','#e9c688'],['.merry','#fff9ed'],['.christmas','#f6d996'],
-      ['.wish','#e9dfd4'],['.signature','#d1ab6f']
-    ];
-    for(const [sel,color] of textParts){
-      const el=document.querySelector('.greeting '+sel);
-      if(!el||getComputedStyle(el).display==='none')continue;
-      const st=getComputedStyle(el),br=el.getBoundingClientRect();
-      cx.save();cx.translate(-stageRect.left,-stageRect.top);cx.textAlign=st.textAlign==='center'?'center':'left';
-      cx.fillStyle=color;cx.shadowColor='rgba(0,0,0,.45)';cx.shadowBlur=9;
-      cx.font=`${st.fontStyle} ${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
-      cx.textBaseline='top';
-      const x=st.textAlign==='center'?br.left+br.width/2:br.left;
-      if(sel==='.wish') {
-        const words=el.textContent.trim().split(/\s+/);
-        let line='',lines=[];
-        const maxW=br.width;
-        for(const word of words){const test=line?line+' '+word:word;
-          if(cx.measureText(test).width>maxW&&line){lines.push(line);line=word;} else line=test;}
-        if(line)lines.push(line);
-        const lineH=parseFloat(st.lineHeight)||parseFloat(st.fontSize)*1.5;
-        lines.forEach((txt,i)=>cx.fillText(txt,x,br.top+i*lineH));
-      }else cx.fillText(el.textContent.trim(),x,br.top);
+    if(ranges.length){ranges.forEach(row=>paint(row.words.join(' '),row.centerY));}
+    else paint(el.textContent.trim(),base.y+base.h/2);
+    cx.restore();
+  }
+  function paintGreeting(cx){
+    const greet=document.querySelector('.greeting');
+    const prevAnimation=greet.style.animation,prevTransform=greet.style.transform;
+    greet.style.animation='none';greet.style.transform='none';
+    const parts=[['.eyebrow','#e9c688'],['.merry','#fff9ed'],['.christmas','#f6d996'],['.wish','#e9dfd4'],['.signature','#d1ab6f']];
+    for(const [selector,color] of parts)paintText(cx,greet.querySelector(selector),color);
+    const divider=greet.querySelector('.divider');
+    if(divider){
+      const r=measured(divider), c=getComputedStyle(divider);
+      const grad=cx.createLinearGradient(r.x,r.y,r.x+r.w,r.y);
+      if(c.marginLeft==='auto'){
+        grad.addColorStop(0,'rgba(255,222,160,0)');grad.addColorStop(.5,'rgba(255,222,160,.8)');grad.addColorStop(1,'rgba(255,222,160,0)');
+      }else{
+        grad.addColorStop(0,'rgba(255,222,160,.8)');grad.addColorStop(1,'rgba(255,222,160,0)');
+      }
+      cx.fillStyle=grad;cx.fillRect(r.x,r.y+r.h/2,r.w,1);
+      cx.save();cx.font='15px Georgia,serif';cx.fillStyle='#f8d88f';cx.textAlign='center';
+      cx.fillText('✦',c.marginLeft==='auto'?r.x+r.w/2:r.x+r.w,r.y+2);
       cx.restore();
     }
+    greet.style.animation=prevAnimation;greet.style.transform=prevTransform;
+  }
+  function paintFamily(cx){
+    const figure=document.getElementById('family-scene');
+    const oldAnim=figure.style.animation,oldTransform=figure.style.transform;
+    const isPortrait=matchMedia('(max-width:680px) and (orientation:portrait)').matches;
+    figure.style.animation='none';
+    figure.style.transform=isPortrait?'translate(50%,0) scale(1)':'none';
+    const r=measured(photo);
+    figure.style.animation=oldAnim;
+    figure.style.transform=oldTransform;
+    if(photo.complete&&photo.naturalWidth){
+      cx.save();cx.shadowColor='rgba(0,0,0,.46)';cx.shadowBlur=17;
+      cx.drawImage(photo,r.x,r.y,r.w,r.h);cx.restore();
+    }
+  }
+  function completedCardCanvas(){
+    // The mobile page is scrollable; its first visible screen is what is saved.
+    // This naturally crops the lower half of the family without changing the photo.
+    const portrait=matchMedia('(max-width:680px) and (orientation:portrait)').matches;
+    const outputHeight=portrait?Math.min(H,window.innerHeight):H;
+    const targetTime=STAR_START+3;
+    const snapshot=document.createElement('canvas');
+    snapshot.width=canvas.width;snapshot.height=canvas.height;
+    snapshot.getContext('2d').drawImage(canvas,0,0);
+    background(targetTime,0);ground(targetTime);gifts(targetTime,false);
+    goldenSpiral(targetTime,false);renderTree(targetTime);scanRing(targetTime);
+    goldenSpiral(targetTime,true);gifts(targetTime,true);starTop(targetTime);
+    const scale=2;
+    const exported=document.createElement('canvas');
+    exported.width=Math.round(W*scale);exported.height=Math.round(outputHeight*scale);
+    const ex=exported.getContext('2d',{alpha:false});
+    ex.setTransform(scale,0,0,scale,0,0);ex.drawImage(canvas,0,0,W,H);
+    // Restore the live animation frame immediately.
+    ctx.save();ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(snapshot,0,0);
+    ctx.restore();
+    paintFamily(ex);paintGreeting(ex);
+    return exported;
+  }
+  async function preparePhotoExport(){
+    const version=++exportVersion;
+    exportFile=null;setSaveAvailable(false);
+    try{
+      if(!photo.complete||!photo.naturalWidth)await photo.decode();
+      if(document.fonts && document.fonts.ready)await document.fonts.ready;
+      await new Promise(resolve=>requestAnimationFrame(resolve));
+      if(version!==exportVersion)return;
+      const img=completedCardCanvas();
+      const blob=await new Promise((resolve,reject)=>img.toBlob(b=>b?resolve(b):reject(new Error('Canvas PNG unavailable')),'image/png'));
+      if(version!==exportVersion)return;
+      exportFile=new File([blob],filename,{type:'image/png'});
+      setSaveAvailable(true);
+    }catch(err){
+      console.error('Failed to prepare card image',err);
+      setSaveAvailable(false);notice('圖片準備失敗，請重新整理網頁。');
+    }
+  }
+  function rebuildPhotoExport(){
+    clearTimeout(exportTimer);
+    exportVersion++;exportFile=null;setSaveAvailable(false);
+    exportTimer=setTimeout(preparePhotoExport,400);
+  }
+  function isAppleMobile(){
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)||
+      (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  }
+  function ordinaryDownload(file){
+    const url=URL.createObjectURL(file);
     const a=document.createElement('a');
-    a.download='SuperAnmas_Christmas_2026.png';a.href=out.toDataURL('image/png');a.click();
+    a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+  }
+  function saveCardToPhone(){
+    // This handler is synchronous until navigator.share, preserving the
+    // iOS Safari / Edge user activation required for the native share sheet.
+    const file=exportFile;
+    if(!file){notice('賀卡圖片仍在準備中，請稍後再按一次。');return;}
+    if(isAppleMobile()&&typeof navigator.share==='function'){
+      try{
+        if(typeof navigator.canShare==='function'&&!navigator.canShare({files:[file]})){
+          ordinaryDownload(file);
+          notice('此瀏覽器無法分享圖片檔，已改用檔案下載。');
+          return;
+        }
+        const action=navigator.share({files:[file],title:'SuperAnmas Christmas 2026'});
+        // The iPhone share sheet offers “Save Image / 儲存影像” for PNG files.
+        Promise.resolve(action).catch(err=>{
+          if(err && err.name==='AbortError')return; // User dismissed share sheet.
+          console.warn('Native file share unavailable',err);
+          ordinaryDownload(file);
+          notice('系統分享無法使用，已嘗試下載 PNG。建議使用 GitHub Pages 網址。');
+        });
+        return;
+      }catch(err){
+        console.warn('Share sheet error',err);
+        ordinaryDownload(file);
+        notice('分享功能暫時不可用，已嘗試下載 PNG。');
+        return;
+      }
+    }
+    ordinaryDownload(file);
+    if(isAppleMobile())notice('請從 Safari 開啟 GitHub Pages HTTPS 網址，以使用「儲存影像」。');
+  }
+  quickSaveButton.addEventListener('click',saveCardToPhone);
+  saveButton.addEventListener('click',saveCardToPhone);
+  document.getElementById('restart').addEventListener('click',()=>{
+    angle=0;elapsed=0;setupTree();rebuildPhotoExport();
   });
   canvas.addEventListener('pointerdown',e=>{dragging=true;dragX=e.clientX;dragMoved=0;canvas.setPointerCapture(e.pointerId);});
   canvas.addEventListener('pointermove',e=>{
@@ -882,13 +1055,15 @@ function gifts(t,front){
   const end=()=>{dragging=false;};
   canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);
   document.addEventListener('keydown',e=>{
-    if(e.code==='Space'){e.preventDefault();setPause(!paused);}
     if(e.code==='ArrowLeft')angle-=.20;
     if(e.code==='ArrowRight')angle+=.20;
-    if(e.code==='KeyR'){angle=0;elapsed=0;setPause(false);}
+    if(e.code==='KeyR'){angle=0;elapsed=0;rebuildPhotoExport();}
   });
-  window.addEventListener('resize',()=>{sizeScene();setupTree();});
+  window.addEventListener('resize',()=>{sizeScene();setupTree();rebuildPhotoExport();});
+  window.addEventListener('orientationchange',()=>rebuildPhotoExport());
+  window.addEventListener('pageshow',()=>rebuildPhotoExport());
   sizeScene();setupTree();requestAnimationFrame(frame);
+  rebuildPhotoExport();
 })();
 </script>
 </body>
